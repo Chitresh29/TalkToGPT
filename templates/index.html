@@ -1,0 +1,119 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant Chat</title>
+    <style>
+        #chat-container {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        #messages {
+            max-height: 300px;
+            overflow-y: scroll;
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <h1>Voice Assistant Chat</h1>
+        <div id="messages"></div>
+        <textarea id="questionBox" rows="2" cols="40" readonly></textarea>
+        <br>
+        <button id="startBtn" onclick="startListening()">Start Recording</button>
+        <button id="stopBtn" onclick="stopListening()">Stop Recording</button>
+    </div>
+
+    <script>
+        let recognition;
+        let messages = [];
+    
+        function startListening() {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+    
+            recognition.onresult = function (event) {
+                let finalTranscript = '';
+    
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    }
+                }
+    
+                document.getElementById('questionBox').value = finalTranscript;
+                sendQuestion();  // Call sendQuestion immediately after setting the question
+            };
+    
+            recognition.onend = function () {
+                console.log('Speech recognition ended.');
+                document.getElementById('questionBox').value = "";
+            };
+    
+            recognition.start();
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+        }
+    
+        function stopListening() {
+            if (recognition) {
+                recognition.stop();
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+            }
+        }
+    
+        async function sendQuestion() {
+            const question = document.getElementById('questionBox').value.trim();
+            if (question !== '') {
+                saveMessage("User", question);
+    
+                try {
+                    const response = await fetch('/api', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ input: question }),
+                    });
+    
+                    const result = await response.json();
+                    console.log("AI Response:", result.message);
+                    saveMessage("AI", result.message);
+                } catch (error) {
+                    console.error("Error fetching AI response:", error);
+                }
+            }
+        }
+    
+        function saveMessage(role, content) {
+            messages.push({ role, content });
+            displayMessages();
+        }
+    
+        function displayMessages() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = "";
+    
+            messages.forEach((message) => {
+                const messageDiv = document.createElement('div');
+                messageDiv.innerHTML = `<strong>${message.role}:</strong> ${message.content}`;
+                messagesDiv.appendChild(messageDiv);
+            });
+    
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
